@@ -24,8 +24,8 @@ page.onLoadFinished = function() {
 
 var action = [
     function openPage(){
-    address = "http://www.concordia.ca/academics/undergraduate/calendar/current/sec71/71-70.html#b71.70.10";
-    //address = "http://www.concordia.ca/academics/undergraduate/calendar/current/sec71/71-60.html";
+    //address = "http://www.concordia.ca/academics/undergraduate/calendar/current/sec71/71-70.html#b71.70.10";
+    address = "http://www.concordia.ca/academics/undergraduate/calendar/current/sec71/71-60.html";
         page.open(address, function (status) {
             if (status !== 'success') {
                 console.log('FAIL to load the address');
@@ -56,22 +56,60 @@ var action = [
     },
     
     function write(){
-        stringArray = dataString.match(/((\s*|)<b>(COMP|SOEN|ENGR|ENCS|COEN) \d\d\d)(.|\n)*?(?=((\s*|)<b>[A-Z][A-Z][A-Z][A-Z] \d\d\d))|$/g);
+        stringArray = dataString.match(/((\s*|)<b>(\s*|)(COMP|SOEN|ENGR|ENCS|COEN) \d\d\d)(.|\n)*?(?=((\s*|)<b>[A-Z][A-Z][A-Z][A-Z] \d\d\d|$))/g);
+
+        stringArray = stringArray.filter(checkNull);
+        
+        function checkNull(e){
+            if (!/^\s*$/.test(e))
+                return e;
+        }
+        
+        function checkCourse(e){
+            if (e != null && /[A-Z][A-Z][A-Z][A-Z] \d\d\d or \d\d\d|[A-Z][A-Z][A-Z][A-Z] \d\d\d or [A-Z][A-Z][A-Z][A-Z] \d\d\d|[A-Z][A-Z][A-Z][A-Z] \d\d\d|\d\d\d/.test(e))
+                return e;
+        }
         
         for (var key in stringArray){
             if(stringArray[key].match(/Prerequisite:(([^\.]|\n)*?(\d\.\d\d)(.|\n)*?\.|([^\.]|\n)*?\.)/)){
                 preArray[key] = stringArray[key].match(/Prerequisite:(([^\.]|\n)*?(\d\.\d\d)(.|\n)*?\.|([^\.]|\n)*?\.)/)[0].match(/[A-Z][A-Z][A-Z][A-Z] \d\d\d or \d\d\d|[A-Z][A-Z][A-Z][A-Z] \d\d\d or [A-Z][A-Z][A-Z][A-Z] \d\d\d|[A-Z][A-Z][A-Z][A-Z] \d\d\d|\d\d\d/g); 
             }
             else
-                preArray[key] = [];
+                preArray[key] = null;
+            
+            if(preArray[key])
+                preArray[key] = preArray[key].filter(checkCourse);
             
             for (var i in preArray[key]){
                 if (!preArray[key][i].match(/[A-Z][A-Z][A-Z][A-Z]/))
                     preArray[key][i] = preArray[key][i-1].match(/[A-Z][A-Z][A-Z][A-Z]/)[0] + " " + preArray[key][i];
+                else if (preArray[key][i].match(/[A-Z][A-Z][A-Z][A-Z] \d\d\d or \d\d\d/)){                                      preArray[key][i] = preArray[key][i].replace(" or "," or " + preArray[key][i].match(/[A-Z][A-Z][A-Z][A-Z]/)[0] + " ");
+                }
+            }
+            
+            if(stringArray[key].match(/Prerequisite:(([^\.]|\n)*?(\d\.\d\d)(.|\n)*?\.|([^\.]|\n)*?\.)/)){
+                coArray[key] = stringArray[key].match(/Prerequisite:(([^\.]|\n)*?(\d\.\d\d)(.|\n)*?\.|([^\.]|\n)*?\.)/)[0].split(/concurrently/); 
+            }
+            else
+                coArray[key] = null;
+            
+            if (coArray[key])
+                coArray[key] = coArray[key].filter(checkCourse);
+            
+            var empty = true;
+            for (var i in coArray[key]){
+                if (coArray[key][i].match(/[A-Z][A-Z][A-Z][A-Z] \d\d\d/)){
+                    coArray[key][i] = coArray[key][i].match(/[A-Z][A-Z][A-Z][A-Z] \d\d\d/)[coArray[key][i].match(/[A-Z][A-Z][A-Z][A-Z] \d\d\d/).length-1];
+                    empty = false;
+                }
+            }
+            if (empty == true){
+                coArray[key] = null;
+            }else{
+                empty = true;
             }
                 
-                
-            if(stringArray[key])
+            if (stringArray[key])
                 stringArray[key] = stringArray[key].match(/[A-Z][A-Z][A-Z][A-Z] \d\d\d/);
         }
         
@@ -81,21 +119,26 @@ var action = [
             OUT[i] = new Object;
             OUT[i]["course"] = stringArray[i];
             OUT[i]["prereq"] = preArray[i];
+            OUT[i]["coreq"] = coArray[i];
         }
         
-        console.log(stringArray[0]);
-        console.log(preArray[0]);
-        console.log(stringArray[1]);
-        console.log(preArray[1]);
+        console.log("Course:            "+stringArray[0]);
+        console.log("Prerequisites:     " +preArray[0]);
+        console.log("Co-requisites:     " +coArray[0]);
+        console.log("Course:            " +stringArray[stringArray.length-1]);
+        console.log("Prerequisites:     " +preArray[preArray.length-1]);
+        console.log("Co-requisites:     " +coArray[coArray.length-1]);
+        
         writeToFile(stringArray, preArray);
         phantom.exit();
     }
 ];
 
 var dataString;
-var stringArray = [];
-var preArray = [];
-var OUT = [];
+var stringArray = new Array;
+var preArray = new Array;
+var coArray = new Array;
+var OUT = new Array;
 
 function writeToFile(){
     if(OUT){
